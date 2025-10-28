@@ -9,13 +9,3 @@ export const generateToken = ({user_id}) => {
 }
 
 
-export const generateRefreshToken = async ({user_id , req}) => {
-
-    try {
-
-        
-        
-    } catch (error) {
-        
-    }
-}

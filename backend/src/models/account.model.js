@@ -90,3 +90,37 @@ export const createAccountData = async ({
         client.release();
     }
 }
+
+
+export const verifyAccount = async({userId}) => {
+
+    const client = await pool.connect();
+    try {
+        
+        if(!userId) {
+            throw new APIError(400 , "UserId not found!");
+        }
+
+        
+
+        await client.query('BEGIN');
+
+        const result = await client.query(`
+                UPDATE "user" 
+                SET email_verified = TRUE
+                WHERE id = $1
+                RETURNING id , email_verified
+            `, [userId]);
+
+        await client.query('COMMIT');
+
+        return result.rows[0];
+    } catch (error) {
+        
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+
+        client.release();
+    }
+}

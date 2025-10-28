@@ -1,5 +1,7 @@
+
 import pool from "../configs/db.config.js";
 import crypto from 'crypto'
+import APIError from "../utils/APIError.util.js";
 
 
 const generateId = ()=> {
@@ -40,3 +42,23 @@ export const signupUserModel = async ({ name, email, email_verified = false, ima
 }
 
 
+export const getUserDataModel = async ({email}) => {
+
+    try {
+        
+        const result = await pool.query(`
+            SELECT * FROM "user" WHERE email = $1
+            ` , [email]);
+
+        if(result.rows.length === 0) {
+            throw new APIError(404 , "User not found!");
+        }
+
+        return result.rows[0];
+
+    } catch (error) {
+        
+        throw error;
+    }
+
+}

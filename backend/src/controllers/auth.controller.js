@@ -1,9 +1,9 @@
 import pool from "../configs/db.config.js";
 import { FRONTEND_URL } from "../configs/env.config.js";
 import redis from "../configs/redis.config.js";
-import { createAccountData } from "../models/account.model.js";
+import { createAccountData, verifyAccount } from "../models/account.model.js";
 import { storeSessionData } from "../models/session.model.js";
-import { signupUserModel } from "../models/user.model.js";
+import { getUserDataModel, signupUserModel } from "../models/user.model.js";
 import APIError from "../utils/APIError.util.js";
 import asyncHandler from "../utils/asyncHandler.util.js";
 import { sendVerificationEmail } from "../utils/email.util.js";
@@ -11,6 +11,8 @@ import { generateToken } from "../utils/generateToken.util.js";
 import { signUpSchema } from "../utils/schemaValidator.util.js";
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto';
+import { emailVerificationToken } from "../utils/verifyEmail.util.js";
+
 
 export const signup = asyncHandler(async ( req , res) => {
 
@@ -53,9 +55,7 @@ export const signup = asyncHandler(async ( req , res) => {
 
     //verify email utility
     
-    const emailToken = crypto.randomBytes(32).toString('hex');
-
-    redis.setex(`verify:${emailToken}` , 300 , newUser.id);
+    const emailToken = await emailVerificationToken({userId: newUser.id , email: newUser.email});
 
     const verificationLink = `${FRONTEND_URL || 'http://localhost:5000'}/api/v1/auth/verify-email/${emailToken}`;
 
@@ -72,6 +72,24 @@ export const signin = asyncHandler( async ( req, res) => {
     }
 
     //find the user from db
+    const userData = await getUserDataModel({email});
+
+    //find password 
+    const passwordData = await pool.query('SELECT * FROM account WHERE user_id = $1' , [userData.id]);
+
+    if(passwordData.rows.length === 0) {
+        throw new APIError(400 , "Password is not set for this account try other login method!");
+    }
+
+    //compare password
+    const passwordMatch = await bcrypt.compare(password , passwordData.rows[0].password);
+
+    if(!passwordMatch){
+        throw new APIError(401 , "Wrong password!");
+    }
+
+    //generate token 
+    
 
 
 })
@@ -80,6 +98,47 @@ export const verifyEmail = asyncHandler(async (req , res)  => {
 
     const token = req.params.token;
 
-    
+    if(!token){
+        throw new APIError(400 , "Verification link corrupted! please request a new one!");
+    }
+
+    const emailToken = `verify:${token}`;
+
+    const userData = await redis.get(emailToken);
+
+    if(!userData){
+        throw new APIError(400 , "Verification link has been expired!");
+    }
+
+    const { userId, email } = JSON.parse(userData);
+
+    //verify existing user
+    const userCheck = await pool.query(`
+        SELECT id , email_verified FROM "user" WHERE id = $1
+        `, [userId] 
+    )
+
+    if(userCheck.rows.length == 0) {
+        throw new APIError(404 , "User not found!");
+    }
+
+    if(userCheck.rows[0].email_verified){
+        throw new APIError(400 , "Email is already verified");
+    }
+
+    //find in db and verify;
+    const result = await verifyAccount({userId: userId});
+
+    await redis.del(emailToken);
+
+    if(result.email_verified) {
+        return res.status(200).json({
+            success: true,
+            message: "Account verifed successfully"
+        })
+    } else {
+        throw new APIError(400 , "Error while verifying account! please try again");
+    }
     
 })
+
