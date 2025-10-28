@@ -68,7 +68,7 @@ export const storeSessionData = async ({
             secure: NODE_ENV === 'production',     
             sameSite: 'strict',
             expires: expires_at,
-            path: '/' // ✅ Added path
+            path: '/' 
         });
 
         await client.query("COMMIT");
@@ -83,69 +83,69 @@ export const storeSessionData = async ({
     }
 }
 
-// ✅ Get session by token
-export const getSessionByToken = async (token) => {
-    const result = await pool.query(
-        `SELECT s.*, u.name, u.email, u.role, u.email_verified, u.banned
-         FROM "session" s
-         JOIN "user" u ON s.user_id = u.id
-         WHERE s.token = $1 AND s.expires_at > NOW()`,
-        [token]
-    );
+// // ✅ Get session by token
+// export const getSessionByToken = async (token) => {
+//     const result = await pool.query(
+//         `SELECT s.*, u.name, u.email, u.role, u.email_verified, u.banned
+//          FROM "session" s
+//          JOIN "user" u ON s.user_id = u.id
+//          WHERE s.token = $1 AND s.expires_at > NOW()`,
+//         [token]
+//     );
 
-    if (result.rows.length === 0) {
-        return null;
-    }
+//     if (result.rows.length === 0) {
+//         return null;
+//     }
 
-    return result.rows[0];
-};
+//     return result.rows[0];
+// };
 
-// ✅ Delete session (logout)
-export const deleteSession = async (token) => {
-    const result = await pool.query(
-        'DELETE FROM "session" WHERE token = $1 RETURNING id',
-        [token]
-    );
+// // ✅ Delete session (logout)
+// export const deleteSession = async (token) => {
+//     const result = await pool.query(
+//         'DELETE FROM "session" WHERE token = $1 RETURNING id',
+//         [token]
+//     );
 
-    if (result.rows.length === 0) {
-        throw new APIError(404, 'Session not found');
-    }
+//     if (result.rows.length === 0) {
+//         throw new APIError(404, 'Session not found');
+//     }
 
-    return { success: true, message: 'Session deleted successfully' };
-};
+//     return { success: true, message: 'Session deleted successfully' };
+// };
 
-// ✅ Delete all user sessions (logout from all devices)
-export const deleteAllUserSessions = async (user_id) => {
-    await pool.query(
-        'DELETE FROM "session" WHERE user_id = $1',
-        [user_id]
-    );
 
-    return { success: true, message: 'All sessions deleted successfully' };
-};
+// export const deleteAllUserSessions = async (user_id) => {
+//     await pool.query(
+//         'DELETE FROM "session" WHERE user_id = $1',
+//         [user_id]
+//     );
 
-// ✅ Get all active sessions for a user
-export const getUserSessions = async (user_id) => {
-    const result = await pool.query(
-        `SELECT id, ip_address, user_agent, created_at, expires_at
-         FROM "session"
-         WHERE user_id = $1 AND expires_at > NOW()
-         ORDER BY created_at DESC`,
-        [user_id]
-    );
+//     return { success: true, message: 'All sessions deleted successfully' };
+// };
 
-    return result.rows;
-};
+// // ✅ Get all active sessions for a user
+// export const getUserSessions = async (user_id) => {
+//     const result = await pool.query(
+//         `   SELECT id, ip_address, user_agent, created_at, expires_at
+//             FROM "session"
+//             WHERE user_id = $1 AND expires_at > NOW()
+//             ORDER BY created_at DESC`,
+//         [user_id]
+//     );
 
-// ✅ Clean up expired sessions (run periodically)
-export const cleanupExpiredSessions = async () => {
-    const result = await pool.query(
-        'DELETE FROM "session" WHERE expires_at <= NOW() RETURNING id'
-    );
+//     return result.rows;
+// };
 
-    return {
-        success: true,
-        deletedCount: result.rows.length,
-        message: `${result.rows.length} expired sessions cleaned up`
-    };
-};
+// // ✅ Clean up expired sessions (run periodically)
+// export const cleanupExpiredSessions = async () => {
+//     const result = await pool.query(
+//         'DELETE FROM "session" WHERE expires_at <= NOW() RETURNING id'
+//     );
+
+//     return {
+//         success: true,
+//         deletedCount: result.rows.length,
+//         message: `${result.rows.length} expired sessions cleaned up`
+//     };
+// };
