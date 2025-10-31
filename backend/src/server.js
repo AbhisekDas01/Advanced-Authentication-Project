@@ -1,6 +1,7 @@
 import express from "express";
 import { PORT } from "./configs/env.config.js";
 import pool from "./configs/db.config.js";
+import cookieParser from 'cookie-parser'
 import createTables from "./schemas/auth.schema.js";
 import errorHandler from "./middlewares/globalErrorHandler.middleware.js";
 import authRouter from "./routes/auth.route.js";
@@ -12,6 +13,7 @@ const app = express();
 // createTables();
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.get('/' , (req , res) =>{
     

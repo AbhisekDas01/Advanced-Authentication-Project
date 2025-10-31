@@ -14,11 +14,12 @@ import crypto from 'crypto';
 import { emailVerificationToken } from "../utils/verifyEmail.util.js";
 
 
+
 export const signup = asyncHandler(async ( req , res) => {
 
     const {name , email , password} = req.body;
 
-    if(!name , !email , !password) {
+    if(!name || !email || !password) {
         throw new APIError(400 , "All fields are mandetory!");
     }
 
@@ -47,11 +48,7 @@ export const signup = asyncHandler(async ( req , res) => {
 
     const accessToken = generateToken({user_id: newUser.id});
 
-    res.status(201).json({
-        success: true,
-        message: "A verification link has been sent  to your account please verify your account",
-        token: accessToken
-    })
+   
 
     //verify email utility
     
@@ -59,7 +56,13 @@ export const signup = asyncHandler(async ( req , res) => {
 
     const verificationLink = `${FRONTEND_URL || 'http://localhost:5000'}/api/v1/auth/verify-email/${emailToken}`;
 
-    sendVerificationEmail({to: newUser.email , name: newUser.name , verificationLink})
+    sendVerificationEmail({to: newUser.email , name: newUser.name , verificationLink});
+
+    res.status(201).json({
+        success: true,
+        message: "A verification link has been sent  to your account please verify your account",
+        token: accessToken
+    })
 
 })
 
@@ -71,25 +74,56 @@ export const signin = asyncHandler( async ( req, res) => {
         throw new APIError(401 , "Missing credentials!");
     }
 
-    //find the user from db
-    const userData = await getUserDataModel({email});
+    //find user from db
+    const userData = await pool.query(`
 
-    //find password 
-    const passwordData = await pool.query('SELECT * FROM account WHERE user_id = $1' , [userData.id]);
+        SELECT 
+            u.id , u.name , u.email , u.role  ,  u.email_verified, u.banned, a.password as hashedpassword 
+            FROM "user" u 
+            LEFT JOIN "account" a ON u.id = a.user_id AND a.provider_id = 'credential'
+            WHERE u.email = $1
+        `, [email]
+    );
 
-    if(passwordData.rows.length === 0) {
-        throw new APIError(400 , "Password is not set for this account try other login method!");
+
+    
+
+    if(userData.rows.length === '0'){
+        throw new APIError(404 , "User with this email does not exists!");
     }
 
+    const user = userData.rows[0];
+
+    
+    
+
+    if (user.banned) {
+        throw new APIError(403, "This account has been banned.");
+    }
+
+    if (!user.hashedpassword) {
+        throw new APIError(400, "Password is not set for this account. Try a different login method.");
+    }
+
+    
+    
+
     //compare password
-    const passwordMatch = await bcrypt.compare(password , passwordData.rows[0].password);
+    const passwordMatch = await bcrypt.compare(password , user.hashedpassword);
 
     if(!passwordMatch){
         throw new APIError(401 , "Wrong password!");
     }
 
     //generate token 
-    
+    const token = generateToken({user_id: user.id});
+
+    const newSession = await storeSessionData({ip_address: req.ip , user_agent: req.headers['user-agent'] , user_id: user.id} , res);
+
+    res.json({
+        message: "login success",
+        token
+    })
 
 
 })
@@ -140,5 +174,41 @@ export const verifyEmail = asyncHandler(async (req , res)  => {
         throw new APIError(400 , "Error while verifying account! please try again");
     }
     
+})
+
+export const resendVerificationEmail = asyncHandler(async(req , res) => {
+
+    const user = req.user;
+
+    if(user.email_verified){
+        throw new APIError(403 , "Email already verfied!");
+    }
+
+
+    //send verification email
+    const emailToken = await emailVerificationToken({userId: user.id , email: user.email});
+
+    const verificationLink = `${FRONTEND_URL || 'http://localhost:5000'}/api/v1/auth/verify-email/${emailToken}`;
+
+    sendVerificationEmail({to: user.email , name: user.name , verificationLink}).then(() => {
+        res.json({
+            message: "Verification link sent successfully"
+        })
+    }).catch((error) => {
+        throw error;
+    })
+
+    
+})
+
+
+export const refreshAccessToken = asyncHandler (async( req, res) => {
+
+    const refreshToken  = req.cookie?.session_token;
+
+    if(!refreshToken){
+
+        throw new APIError(401 , "Session expired or invalid. Please login again");
+    }
 })
 
