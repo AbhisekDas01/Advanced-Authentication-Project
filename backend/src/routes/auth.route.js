@@ -4,6 +4,7 @@ import {
     resendVerificationEmail, 
     signin, 
     signout, 
+    signoutFromAllDeviceExpectLoggedin, 
     signup, 
     singoutFromADevice, 
     verifyEmail 
@@ -19,5 +20,6 @@ authRouter.post('/resend-verification-link' , verifyAccessToken , resendVerifica
 authRouter.post('/refresh-access-token' , refreshAccessToken);
 authRouter.post('/signout' , verifyAccessToken , signout);
 authRouter.post('/singout-other-device' , verifyAccessToken , verifiedAccountPath , singoutFromADevice );
+authRouter.post('/singout-all-device' , verifyAccessToken , verifiedAccountPath , signoutFromAllDeviceExpectLoggedin );
 
 export default authRouter;

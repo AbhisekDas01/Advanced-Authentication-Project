@@ -10,7 +10,6 @@ import { sendVerificationEmail } from "../utils/email.util.js";
 import { generateToken } from "../utils/generateToken.util.js";
 import { signUpSchema } from "../utils/schemaValidator.util.js";
 import bcrypt from 'bcryptjs'
-import crypto from 'crypto';
 import { emailVerificationToken } from "../utils/verifyEmail.util.js";
 
 
@@ -285,13 +284,33 @@ export const singoutFromADevice = asyncHandler (async (req , res) => {
 
 export const signoutFromAllDeviceExpectLoggedin = asyncHandler (async (req , res) => {
 
-    const refreshToken = req.cookies?.session_token;
-    const user = req.user;
+    
+    const currentRefreshToken = req.cookies?.session_token;
+    const userId = req.user.id;
 
-    if(!refreshToken){
-
-        throw new APIError(400 , "Session not found please login again")
+    if(!currentRefreshToken){
+        throw new APIError(401, "Current session not found. Please log in again.");
     }
 
-    
-})
+    const { rows: deletedSessions } = await pool.query(`
+        DELETE FROM "session" 
+        WHERE user_id = $1 AND token != $2
+        RETURNING id
+        `, 
+        [userId, currentRefreshToken]
+    );
+
+    const deletedCount = deletedSessions.length;
+
+    if (deletedCount > 0) {
+        return res.json({
+            success: true,
+            message: `Successfully signed out from ${deletedCount} other device(s).`
+        });
+    } else {
+        return res.json({
+            success: true,
+            message: "No other active sessions found."
+        });
+    }
+});
