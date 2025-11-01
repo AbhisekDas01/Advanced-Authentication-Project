@@ -83,36 +83,36 @@ export const storeSessionData = async ({
     }
 }
 
-// // ✅ Get session by token
-// export const getSessionByToken = async (token) => {
-//     const result = await pool.query(
-//         `SELECT s.*, u.name, u.email, u.role, u.email_verified, u.banned
-//          FROM "session" s
-//          JOIN "user" u ON s.user_id = u.id
-//          WHERE s.token = $1 AND s.expires_at > NOW()`,
-//         [token]
-//     );
+// ✅ Get session by token
+export const getSessionByToken = async (token) => {
+    const result = await pool.query(`
+            SELECT u.id , u.name , u.email FROM "user" u 
+            LEFT JOIN "session" s 
+            ON u.id = s.user_id
+            WHERE s.token = $1 AND s.expires_at > NOW()
+        
+        `, [token]);
 
-//     if (result.rows.length === 0) {
-//         return null;
-//     }
+    if (result.rows.length === 0) {
+        return null;
+    }
 
-//     return result.rows[0];
-// };
+    return result.rows[0];
+};
 
 // // ✅ Delete session (logout)
-// export const deleteSession = async (token) => {
-//     const result = await pool.query(
-//         'DELETE FROM "session" WHERE token = $1 RETURNING id',
-//         [token]
-//     );
+export const deleteSession = async (token) => {
+    const result = await pool.query(
+        'DELETE FROM "session" WHERE token = $1 RETURNING id',
+        [token]
+    );
 
-//     if (result.rows.length === 0) {
-//         throw new APIError(404, 'Session not found');
-//     }
+    if (result.rows.length === 0) {
+        throw new APIError(404, 'Session not found');
+    }
 
-//     return { success: true, message: 'Session deleted successfully' };
-// };
+    return { success: true, message: 'Session deleted successfully' };
+};
 
 
 // export const deleteAllUserSessions = async (user_id) => {

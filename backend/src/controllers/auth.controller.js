@@ -2,7 +2,7 @@ import pool from "../configs/db.config.js";
 import { FRONTEND_URL } from "../configs/env.config.js";
 import redis from "../configs/redis.config.js";
 import { createAccountData, verifyAccount } from "../models/account.model.js";
-import { storeSessionData } from "../models/session.model.js";
+import { deleteSession, getSessionByToken, storeSessionData } from "../models/session.model.js";
 import { getUserDataModel, signupUserModel } from "../models/user.model.js";
 import APIError from "../utils/APIError.util.js";
 import asyncHandler from "../utils/asyncHandler.util.js";
@@ -12,6 +12,7 @@ import { signUpSchema } from "../utils/schemaValidator.util.js";
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto';
 import { emailVerificationToken } from "../utils/verifyEmail.util.js";
+
 
 
 
@@ -88,7 +89,7 @@ export const signin = asyncHandler( async ( req, res) => {
 
     
 
-    if(userData.rows.length === '0'){
+    if(userData.rows.length === 0){
         throw new APIError(404 , "User with this email does not exists!");
     }
 
@@ -204,11 +205,93 @@ export const resendVerificationEmail = asyncHandler(async(req , res) => {
 
 export const refreshAccessToken = asyncHandler (async( req, res) => {
 
-    const refreshToken  = req.cookie?.session_token;
+    const refreshToken  = req.cookies?.session_token;
 
     if(!refreshToken){
 
         throw new APIError(401 , "Session expired or invalid. Please login again");
     }
+
+    
+
+    const session = await getSessionByToken(refreshToken);
+
+    
+
+    //delete the session
+    await deleteSession(refreshToken);
+
+     const newSession = await storeSessionData({
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        user_id: session.id
+    }, res);
+
+    const token = generateToken({user_id: session.id});
+
+    res.json({
+        success: true,
+        message: "Session refreshed successfully.",
+        token
+    })
 })
 
+export const signout = asyncHandler( async ( req , res) => {
+
+    const refreshToken = req.cookies?.session_token;
+
+    if(refreshToken) {
+        try {
+            await deleteSession(refreshToken);
+        } catch (error) {
+            
+        }
+    }
+
+        res.clearCookie('session_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/'
+    });
+
+    res.status(200).json({ success: true, message: "Signed out successfully." });
+
+})
+
+export const singoutFromADevice = asyncHandler (async (req , res) => {
+
+    const sessionId = req.body.sessionId;
+    const userId = req.user.id;
+
+    if(!sessionId) {
+        throw new APIError(400 , "Session not found!")
+    }
+
+    const sessionData = await pool.query(`
+        DELETE FROM "session" 
+        WHERE id = $1 AND user_id = $2
+        RETURNING user_agent` , [sessionId , userId]);
+
+     if (sessionData.rows.length === 0) {
+        // This happens if the session ID is invalid or belongs to another user.
+        throw new APIError(404, "Session not found or you do not have permission to remove it.");
+    }
+
+    return res.json({
+        message: `Logged out from ${sessionData.rows[0].user_agent}`
+    })
+})
+
+export const signoutFromAllDeviceExpectLoggedin = asyncHandler (async (req , res) => {
+
+    const refreshToken = req.cookies?.session_token;
+    const user = req.user;
+
+    if(!refreshToken){
+
+        throw new APIError(400 , "Session not found please login again")
+    }
+
+    
+})
