@@ -314,3 +314,14 @@ export const signoutFromAllDeviceExpectLoggedin = asyncHandler (async (req , res
         });
     }
 });
+
+
+//password
+
+export const forgetPassword = asyncHandler (async (req , res) => {
+
+})
+
+export const changePassword = asyncHandler (async ( req , res) => {
+    
+})
